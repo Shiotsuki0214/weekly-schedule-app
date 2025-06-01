@@ -32,18 +32,62 @@
             `;
             
             authStatus.innerHTML += troubleshootingHTML;
-        }        // 基本関数（先に定義）
+        }        // 基本関数（最初に定義）
         
         // ステータスメッセージ表示
         function showStatus(message, type = 'info') {
             const statusArea = document.getElementById('statusArea');
-            statusArea.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            if (statusArea) {
+                statusArea.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            }
         }
 
         // 認証ステータス表示
         function showAuthStatus(message, type) {
             const authStatus = document.getElementById('authStatus');
-            authStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            if (authStatus) {
+                authStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            }
+        }
+
+        // ファイル検証
+        function validateFile(file) {
+            if (!file) return { valid: false, error: 'ファイルが選択されていません' };
+            
+            if (file.size > SECURITY.maxFileSize) {
+                return { valid: false, error: 'ファイルサイズが大きすぎます（最大10MB）' };
+            }
+            
+            if (!SECURITY.allowedImageTypes.includes(file.type)) {
+                return { valid: false, error: '対応していないファイル形式です（JPEG, PNGのみ）' };
+            }
+            
+            return { valid: true };
+        }
+
+        // フォーム完了チェック
+        function checkFormCompletion() {
+            try {
+                const imageFileElement = document.getElementById('imageFile');
+                const processBtn = document.getElementById('processBtn');
+
+                if (!processBtn || !imageFileElement) return; // 要素が存在しない場合は早期リターン
+
+                const imageFile = imageFileElement.files[0];
+                const hasValidFile = imageFile && validateFile(imageFile).valid;
+                const isComplete = hasValidFile && timeSlots && timeSlots.length > 0 && isSignedIn && APP_CONFIG;
+                processBtn.disabled = !isComplete;
+
+                console.log('フォーム完了チェック:', {
+                    hasValidFile: hasValidFile,
+                    timeSlots: !!(timeSlots && timeSlots.length > 0),
+                    isSignedIn: isSignedIn,
+                    hasConfig: !!APP_CONFIG,
+                    isComplete: isComplete
+                });
+            } catch (error) {
+                console.error('checkFormCompletion エラー:', error);
+            }
         }        // 認証ステータス表示
         function showAuthStatus(message, type) {
             const authStatus = document.getElementById('authStatus');
@@ -766,29 +810,35 @@ window.APP_CONFIG = {
 
         // 認証状態更新（新しいGIS対応）
         function updateAuthStatus() {
-            const authorizeBtn = document.getElementById('authorizeBtn');
-            const signOutBtn = document.getElementById('signOutBtn');
-            const usageStatsDiv = document.getElementById('usageStats');
-            
-            if (isSignedIn && accessToken) {
-                authorizeBtn.textContent = `✅ サインイン済み`;
-                authorizeBtn.disabled = true;
-                authorizeBtn.classList.add('hidden');
-                signOutBtn.classList.remove('hidden');
-                showAuthStatus('✅ Google認証が完了しました。', 'success');
+            try {
+                const authorizeBtn = document.getElementById('authorizeBtn');
+                const signOutBtn = document.getElementById('signOutBtn');
+                const usageStatsDiv = document.getElementById('usageStats');
                 
-                usageStatsDiv.classList.remove('hidden');
-                usageTracker.updateStatsDisplay();
-            } else {
-                authorizeBtn.textContent = '🔓 Googleアカウントでサインイン';
-                authorizeBtn.disabled = false;
-                authorizeBtn.classList.remove('hidden');
-                signOutBtn.classList.add('hidden');
-                showAuthStatus('⚠️ Google認証が必要です', 'info');
-                usageStatsDiv.classList.add('hidden');
+                if (!authorizeBtn || !signOutBtn || !usageStatsDiv) return;
+                
+                if (isSignedIn && accessToken) {
+                    authorizeBtn.textContent = `✅ サインイン済み`;
+                    authorizeBtn.disabled = true;
+                    authorizeBtn.classList.add('hidden');
+                    signOutBtn.classList.remove('hidden');
+                    showAuthStatus('✅ Google認証が完了しました。', 'success');
+                    
+                    usageStatsDiv.classList.remove('hidden');
+                    usageTracker.updateStatsDisplay();
+                } else {
+                    authorizeBtn.textContent = '🔓 Googleアカウントでサインイン';
+                    authorizeBtn.disabled = false;
+                    authorizeBtn.classList.remove('hidden');
+                    signOutBtn.classList.add('hidden');
+                    showAuthStatus('⚠️ Google認証が必要です', 'info');
+                    usageStatsDiv.classList.add('hidden');
+                }
+                
+                checkFormCompletion();
+            } catch (error) {
+                console.error('updateAuthStatus エラー:', error);
             }
-            
-            checkFormCompletion();
         }
 
         // サインイン処理（新しいGIS使用）
@@ -828,41 +878,57 @@ window.APP_CONFIG = {
             }
         }
 
-        // ファイルアップロード処理
-        document.getElementById('imageFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            const label = document.getElementById('fileLabel');
-            const previewArea = document.getElementById('previewArea');
-
-            if (file) {
-                const validation = validateFile(file);
-                if (!validation.valid) {
-                    showStatus(`❌ ${validation.error}`, 'error');
-                    this.value = '';
-                    return;
-                }
-
-                label.textContent = `✅ ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
-                label.classList.add('has-file');
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewArea.innerHTML = `<img src="${e.target.result}" class="preview-image" alt="週案プレビュー">`;
-                };
-                reader.onerror = function() {
-                    showStatus('❌ 画像の読み込みに失敗しました', 'error');
-                };
-                reader.readAsDataURL(file);
-                
-                checkFormCompletion();
-                showStatus('✅ 画像が正常にアップロードされました', 'success');
-            } else {
-                label.textContent = '📁 週案画像を選択してください';
-                label.classList.remove('has-file');
-                previewArea.innerHTML = '<p style="color: #666;">画像をアップロードするとここにプレビューが表示されます</p>';
-                checkFormCompletion();
+        // イベントリスナー（DOMContentLoaded後に設定）
+        function setupEventListeners() {
+            const authorizeBtn = document.getElementById('authorizeBtn');
+            const signOutBtn = document.getElementById('signOutBtn');
+            const imageFile = document.getElementById('imageFile');
+            
+            if (authorizeBtn) {
+                authorizeBtn.addEventListener('click', signIn);
             }
-        });
+            
+            if (signOutBtn) {
+                signOutBtn.addEventListener('click', signOut);
+            }
+            
+            if (imageFile) {
+                imageFile.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    const label = document.getElementById('fileLabel');
+                    const previewArea = document.getElementById('previewArea');
+
+                    if (file) {
+                        const validation = validateFile(file);
+                        if (!validation.valid) {
+                            showStatus(`❌ ${validation.error}`, 'error');
+                            this.value = '';
+                            return;
+                        }
+
+                        label.textContent = `✅ ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
+                        label.classList.add('has-file');
+                        
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            previewArea.innerHTML = `<img src="${e.target.result}" class="preview-image" alt="週案プレビュー">`;
+                        };
+                        reader.onerror = function() {
+                            showStatus('❌ 画像の読み込みに失敗しました', 'error');
+                        };
+                        reader.readAsDataURL(file);
+                        
+                        checkFormCompletion();
+                        showStatus('✅ 画像が正常にアップロードされました', 'success');
+                    } else {
+                        label.textContent = '📁 週案画像を選択してください';
+                        label.classList.remove('has-file');
+                        previewArea.innerHTML = '<p style="color: #666;">画像をアップロードするとここにプレビューが表示されます</p>';
+                        checkFormCompletion();
+                    }
+                });
+            }
+        }
 
         // ステータスメッセージ表示
         function showStatus(message, type = 'info') {
@@ -1171,25 +1237,7 @@ window.APP_CONFIG = {
             }
         });
 
-        // フォーム完了チェック
-        function checkFormCompletion() {
-            const imageFile = document.getElementById('imageFile').files[0];
-            const processBtn = document.getElementById('processBtn');
-
-            if (!processBtn) return; // 要素が存在しない場合は早期リターン
-
-            const hasValidFile = imageFile && validateFile(imageFile).valid;
-            const isComplete = hasValidFile && timeSlots && timeSlots.length > 0 && isSignedIn && APP_CONFIG;
-            processBtn.disabled = !isComplete;
-
-            console.log('フォーム完了チェック:', {
-                hasValidFile: hasValidFile,
-                timeSlots: !!(timeSlots && timeSlots.length > 0),
-                isSignedIn: isSignedIn,
-                hasConfig: !!APP_CONFIG,
-                isComplete: isComplete
-            });
-        }
+        // フォーム完了チェック（削除 - 上で既に定義済み）
 
         // 解析結果表示
         function displaySchedulePreview(scheduleData) {
@@ -1249,7 +1297,11 @@ window.APP_CONFIG = {
             }
             console.log('時程表データ読み込み完了');
             
-            // 3. Google API初期化（GAPIとGISライブラリの読み込み完了を待つ）
+            // 3. イベントリスナー設定
+            setupEventListeners();
+            console.log('イベントリスナー設定完了');
+            
+            // 4. Google API初期化（GAPIとGISライブラリの読み込み完了を待つ）
             setTimeout(() => {
                 if (typeof gapi !== 'undefined' && typeof google !== 'undefined' && google.accounts) {
                     console.log('Google API初期化開始');
@@ -1262,7 +1314,7 @@ window.APP_CONFIG = {
                 }
             }, 1000);
             
-            // 4. 初期状態でフォーム完了チェック
+            // 5. 初期状態でフォーム完了チェック
             setTimeout(() => {
                 if (checkFormCompletion) {
                     checkFormCompletion();
@@ -1270,9 +1322,7 @@ window.APP_CONFIG = {
             }, 1500);
         });
 
-        // イベントリスナー
-        document.getElementById('authorizeBtn').addEventListener('click', signIn);
-        document.getElementById('signOutBtn').addEventListener('click', signOut);
+        // イベントリスナー（削除 - setupEventListeners()で設定済み）
 
         // エラーハンドリング
         window.addEventListener('error', function(e) {
