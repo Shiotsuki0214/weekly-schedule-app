@@ -186,10 +186,17 @@ function updateSigninStatus(isSignedIn) {
 }
 
 function handleAuthClick() {
-    if (auth2.isSignedIn.get()) {
-        auth2.signOut();
+    // auth2 が初期化されているか確認
+    if (auth2) {
+        if (auth2.isSignedIn.get()) {
+            auth2.signOut();
+        } else {
+            auth2.signIn();
+        }
     } else {
-        auth2.signIn();
+        // auth2 がまだ初期化されていない場合のログ
+        addLog('Google認証がまだ初期化されていません。しばらくお待ちください。', 'warning');
+        // 必要に応じて、認証ボタンを一時的に無効にするなどのUIフィードバックを追加
     }
 }
 
