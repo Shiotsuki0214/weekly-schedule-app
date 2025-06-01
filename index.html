@@ -1,70 +1,4 @@
-// Google API初期化
-        async function initializeGapi() {
-            try {
-                await new Promise((resolve) => {
-                    gapi.load('auth2:client', resolve);
-                });
-
-                await gapi.client.init({
-                    apiKey: API_KEY,
-                    clientId: CLIENT_ID,
-                    discoveryDocs: [DISCOVERY_DOC, 'https://sheets.googleapis.com/$discovery/rest?version=v4'],
-                    scope: SCOPES
-                });
-
-                const authInstance = gapi.auth2.getAuthInstance();
-                isSignedIn = authInstance.isSignedIn.get();
-                
-                updateAuthStatus();
-                
-                // サインイン状態の変化を監視
-                authInstance.isSignedIn.listen(updateAuthStatus);
-                
-                console.log('Google API初期化完了');
-            } catch (error) {
-                console.error('Google API初期化エラー:', error);
-                showAuthStatus('❌ Google API初期化に失敗しました', 'error');
-            }
-        }
-
-        // 認証状態更新
-        function updateAuthStatus() {
-            const authInstance = gapi.auth2.getAuthInstance();
-            isSignedIn = authInstance.isSignedIn.get();
-            
-            const authorizeBtn = document.getElementById('authorizeBtn');
-            
-            if (isSignedIn) {
-                const user = authInstance.currentUser.get();
-                const profile = user.getBasicProfile();
-                authorizeBtn.textContent = `✅ ${profile.getName()}でサインイン中`;
-                authorizeBtn.disabled = true;
-                showAuthStatus('✅ Google認証が完了しました。カレンダーとスプレッドシートにアクセスできます。', 'success');
-            } else {
-                authorizeBtn.textContent = '🔓 Googleアカウントでサインイン';
-                authorizeBtn.disabled = false;
-                showAuthStatus('⚠️ Google認証が必要です', 'info');
-            }
-            
-            checkFormCompletion();
-        }
-
-        // 認証ステータス表示
-        function showAuthStatus(message, type) {
-            const authStatus = document.getElementById('authStatus');
-            authStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
-        }
-
-        // サインイン処理
-        async function signIn() {
-            try {
-                const authInstance = gapi.auth2.getAuthInstance();
-                await authInstance.signIn();
-            } catch (error) {
-                console.error('サインインエラー:', error);
-                showAuthStatus('❌ サインインに失敗しました', 'error');
-            }
-        }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -280,6 +214,12 @@
             border: 1px solid rgba(23, 162, 184, 0.2);
         }
 
+        .status-warning {
+            background: rgba(255, 193, 7, 0.1);
+            color: #856404;
+            border: 1px solid rgba(255, 193, 7, 0.2);
+        }
+
         .schedule-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -339,6 +279,27 @@
             gap: 20px;
         }
 
+        .config-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .config-section h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .usage-stats {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
         @media (max-width: 768px) {
             .grid-2 {
                 grid-template-columns: 1fr;
@@ -362,14 +323,38 @@
         </div>
 
         <div class="main-content">
+            <!-- 設定セクション -->
+            <div class="config-section">
+                <h3>⚙️ 初期設定が必要です</h3>
+                <p>このアプリを使用するには、Google Cloud ConsoleでAPIキーとクライアントIDを設定する必要があります。</p>
+                <p><strong>config.js</strong> ファイルを作成し、以下の値を設定してください：</p>
+                <pre style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
+// config.js
+window.APP_CONFIG = {
+    CLIENT_ID: 'あなたのクライアントID',
+    API_KEY: 'あなたのAPIキー',
+    SPREADSHEET_ID: '1RUYuKXKIKqMZ7M6B9cJnRHEsoAGqx1tkqXgBvK8jzLk'
+};
+                </pre>
+                <div id="configStatus" class="status-message status-warning">
+                    ⚠️ 設定ファイルが読み込まれていません
+                </div>
+            </div>
+
             <!-- Google認証セクション -->
             <div class="section">
                 <h2>🔐 Google認証</h2>
                 <div id="authSection">
-                    <button id="authorizeBtn" class="btn">
+                    <button id="authorizeBtn" class="btn" disabled>
                         🔓 Googleアカウントでサインイン
                     </button>
                     <div id="authStatus" style="margin-top: 15px;"></div>
+                </div>
+                
+                <!-- 使用量統計 -->
+                <div id="usageStats" class="usage-stats hidden">
+                    <h4>📊 今日の使用状況</h4>
+                    <div id="statsContent"></div>
                 </div>
             </div>
 
@@ -408,23 +393,112 @@
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="config.js"></script>
     <script>
-        // Google API設定
-        const CLIENT_ID = '128812767208-k0aqkvnccauv1r7ukajqsungulquit4u.apps.googleusercontent.com'; // ここに実際のClient IDを設定してください
-        const API_KEY = 'AIzaSyAi6BG9NeJFHh6s565E7obnbE27wpmqP-k'; // ここに実際のAPI Keyを設定してください
-        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
-        const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets';
-        const SPREADSHEET_ID = '1RUYuKXKIKqMZ7M6B9cJnRHEsoAGqx1tkqXgBvK8jzLk';
+        // セキュリティ設定
+        const SECURITY = {
+            maxDailyRequests: 50,
+            maxFileSize: 10 * 1024 * 1024, // 10MB
+            allowedImageTypes: ['image/jpeg', 'image/png', 'image/jpg'],
+            rateLimitWindow: 60000, // 1分
+            maxRequestsPerWindow: 5
+        };
 
+        // 使用量追跡
+        const usageTracker = {
+            key: 'weeklyScheduleApp_usage',
+            
+            getTodayUsage() {
+                const today = new Date().toDateString();
+                const data = JSON.parse(localStorage.getItem(this.key) || '{}');
+                return data[today] || { requests: 0, lastReset: Date.now() };
+            },
+            
+            incrementUsage() {
+                const today = new Date().toDateString();
+                const data = JSON.parse(localStorage.getItem(this.key) || '{}');
+                data[today] = { 
+                    requests: (data[today]?.requests || 0) + 1, 
+                    lastReset: Date.now() 
+                };
+                localStorage.setItem(this.key, JSON.stringify(data));
+                this.updateStatsDisplay();
+            },
+            
+            checkLimit() {
+                const usage = this.getTodayUsage();
+                return usage.requests < SECURITY.maxDailyRequests;
+            },
+            
+            updateStatsDisplay() {
+                const usage = this.getTodayUsage();
+                const statsDiv = document.getElementById('statsContent');
+                const remaining = SECURITY.maxDailyRequests - usage.requests;
+                
+                statsDiv.innerHTML = `
+                    <p>今日の処理回数: ${usage.requests}/${SECURITY.maxDailyRequests}</p>
+                    <p>残り処理可能回数: ${remaining}</p>
+                    <p style="font-size: 0.9em; color: #666;">制限は日本時間の0時にリセットされます</p>
+                `;
+                
+                if (remaining <= 5) {
+                    statsDiv.innerHTML += '<p style="color: #dc3545;">⚠️ 本日の制限に近づいています</p>';
+                }
+            }
+        };
+
+        // レート制限
+        const rateLimiter = {
+            requests: [],
+            
+            canMakeRequest() {
+                const now = Date.now();
+                this.requests = this.requests.filter(time => now - time < SECURITY.rateLimitWindow);
+                return this.requests.length < SECURITY.maxRequestsPerWindow;
+            },
+            
+            recordRequest() {
+                this.requests.push(Date.now());
+            }
+        };
+
+        // 設定チェック
+        let APP_CONFIG = null;
         let gapi;
-        let google;
         let isSignedIn = false;
-
-        // グローバル変数
         let scheduleData = null;
         let timeSlots = null;
 
-        // 週時程表CSVデータ（埋め込み）
+        // 設定ファイル読み込みチェック
+        function checkConfig() {
+            if (window.APP_CONFIG && window.APP_CONFIG.CLIENT_ID && window.APP_CONFIG.API_KEY) {
+                APP_CONFIG = window.APP_CONFIG;
+                document.getElementById('configStatus').innerHTML = 
+                    '<div class="status-message status-success">✅ 設定ファイルが正常に読み込まれました</div>';
+                return true;
+            } else {
+                document.getElementById('configStatus').innerHTML = 
+                    '<div class="status-message status-error">❌ config.js ファイルが見つからないか、設定が不完全です</div>';
+                return false;
+            }
+        }
+
+        // ファイル検証
+        function validateFile(file) {
+            if (!file) return { valid: false, error: 'ファイルが選択されていません' };
+            
+            if (file.size > SECURITY.maxFileSize) {
+                return { valid: false, error: 'ファイルサイズが大きすぎます（最大10MB）' };
+            }
+            
+            if (!SECURITY.allowedImageTypes.includes(file.type)) {
+                return { valid: false, error: '対応していないファイル形式です（JPEG, PNGのみ）' };
+            }
+            
+            return { valid: true };
+        }
+
+        // CSVデータ（埋め込み）
         const csvData = `Subject,曜日,開始時刻,終了時刻
 読書タイム,月,8:10,8:25
 1時間目,月,8:40,9:25
@@ -490,10 +564,9 @@
 帰りの会,金,15:20,15:35
 外部講師,金,15:35,17:05`;
 
-        // 週時程表データの解析
+        // 時程表データの解析
         function loadTimeSlots() {
             try {
-                // PapaParse使用せずに手動解析
                 const lines = csvData.trim().split('\n');
                 const headers = lines[0].split(',');
                 
@@ -516,42 +589,102 @@
             }
         }
 
-        // ページ読み込み時の初期化
-        document.addEventListener('DOMContentLoaded', function() {
-            // 時程表データを読み込み
-            loadTimeSlots();
-            
-            // Google API初期化
-            initializeGapi();
-            
-            // 初期状態でフォーム完了チェック
-            setTimeout(checkFormCompletion, 100);
-        });
+        // Google API初期化
+        async function initializeGapi() {
+            if (!APP_CONFIG) {
+                showAuthStatus('❌ 設定ファイルを読み込んでください', 'error');
+                return;
+            }
 
-        // サインインボタンイベント
-        document.getElementById('authorizeBtn').addEventListener('click', signIn);
+            try {
+                await new Promise((resolve) => {
+                    gapi.load('auth2:client', resolve);
+                });
+
+                await gapi.client.init({
+                    apiKey: APP_CONFIG.API_KEY,
+                    clientId: APP_CONFIG.CLIENT_ID,
+                    discoveryDocs: [
+                        'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
+                        'https://sheets.googleapis.com/$discovery/rest?version=v4'
+                    ],
+                    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets'
+                });
+
+                const authInstance = gapi.auth2.getAuthInstance();
+                isSignedIn = authInstance.isSignedIn.get();
+                
+                updateAuthStatus();
+                authInstance.isSignedIn.listen(updateAuthStatus);
+                
+                console.log('Google API初期化完了');
+            } catch (error) {
+                console.error('Google API初期化エラー:', error);
+                showAuthStatus('❌ Google API初期化に失敗しました', 'error');
+            }
+        }
+
+        // 認証状態更新
+        function updateAuthStatus() {
+            const authInstance = gapi.auth2.getAuthInstance();
+            isSignedIn = authInstance.isSignedIn.get();
+            
+            const authorizeBtn = document.getElementById('authorizeBtn');
+            const usageStatsDiv = document.getElementById('usageStats');
+            
+            if (isSignedIn) {
+                const user = authInstance.currentUser.get();
+                const profile = user.getBasicProfile();
+                authorizeBtn.textContent = `✅ ${profile.getName()}でサインイン中`;
+                authorizeBtn.disabled = true;
+                showAuthStatus('✅ Google認証が完了しました。', 'success');
+                
+                usageStatsDiv.classList.remove('hidden');
+                usageTracker.updateStatsDisplay();
+            } else {
+                authorizeBtn.textContent = '🔓 Googleアカウントでサインイン';
+                authorizeBtn.disabled = false;
+                showAuthStatus('⚠️ Google認証が必要です', 'info');
+                usageStatsDiv.classList.add('hidden');
+            }
+            
+            checkFormCompletion();
+        }
+
+        // 認証ステータス表示
+        function showAuthStatus(message, type) {
+            const authStatus = document.getElementById('authStatus');
+            authStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+        }
+
+        // サインイン処理
+        async function signIn() {
+            try {
+                const authInstance = gapi.auth2.getAuthInstance();
+                await authInstance.signIn();
+            } catch (error) {
+                console.error('サインインエラー:', error);
+                showAuthStatus('❌ サインインに失敗しました', 'error');
+            }
+        }
 
         // ファイルアップロード処理
         document.getElementById('imageFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
             const label = document.getElementById('fileLabel');
             const previewArea = document.getElementById('previewArea');
-            const processBtn = document.getElementById('processBtn');
-
-            console.log('ファイル選択:', file); // デバッグ用
 
             if (file) {
-                // ファイルタイプの検証
-                if (!file.type.startsWith('image/')) {
-                    showStatus('❌ 画像ファイルを選択してください', 'error');
-                    this.value = ''; // ファイル選択をリセット
+                const validation = validateFile(file);
+                if (!validation.valid) {
+                    showStatus(`❌ ${validation.error}`, 'error');
+                    this.value = '';
                     return;
                 }
 
                 label.textContent = `✅ ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
                 label.classList.add('has-file');
                 
-                // 画像プレビュー
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     previewArea.innerHTML = `<img src="${e.target.result}" class="preview-image" alt="週案プレビュー">`;
@@ -561,36 +694,15 @@
                 };
                 reader.readAsDataURL(file);
                 
-                // ボタンを有効化（他の条件もチェック）
                 checkFormCompletion();
-                
                 showStatus('✅ 画像が正常にアップロードされました', 'success');
             } else {
                 label.textContent = '📁 週案画像を選択してください';
                 label.classList.remove('has-file');
                 previewArea.innerHTML = '<p style="color: #666;">画像をアップロードするとここにプレビューが表示されます</p>';
-                processBtn.disabled = true;
-                showStatus('', ''); // ステータスをクリア
+                checkFormCompletion();
             }
         });
-
-        // フォーム完了チェック
-        function checkFormCompletion() {
-            const imageFile = document.getElementById('imageFile').files[0];
-            const processBtn = document.getElementById('processBtn');
-
-            const isComplete = imageFile && timeSlots && timeSlots.length > 0 && isSignedIn;
-            processBtn.disabled = !isComplete;
-
-            console.log('フォーム完了チェック:', {
-                imageFile: !!imageFile,
-                timeSlots: !!(timeSlots && timeSlots.length > 0),
-                isSignedIn: isSignedIn,
-                isComplete: isComplete
-            });
-        }
-
-        // 入力フィールドの変更監視は削除（画像ファイルのみ監視）
 
         // ステータスメッセージ表示
         function showStatus(message, type = 'info') {
@@ -600,11 +712,8 @@
 
         // 画像解析（模擬実装）
         async function analyzeScheduleImage(imageFile) {
-            // 実際の実装では、OCRライブラリやAI APIを使用
-            // ここでは週案の模擬データを返す
             showStatus('🔍 画像を解析中...', 'info');
             
-            // 模擬的な解析結果（実際の週案画像に基づく）
             const mockSchedule = {
                 '月': {
                     '1時間目': '国語',
@@ -647,7 +756,7 @@
                 }
             };
 
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 解析時間の模擬
+            await new Promise(resolve => setTimeout(resolve, 2000));
             return mockSchedule;
         }
 
@@ -665,7 +774,7 @@
             return date;
         }
 
-        // Googleカレンダーイベント作成（実装）
+        // Googleカレンダーイベント作成
         async function createCalendarEvent(title, startDate, endDate, description = '') {
             try {
                 const event = {
@@ -686,7 +795,6 @@
                     resource: event
                 });
 
-                console.log('イベント作成成功:', response);
                 return response.result;
             } catch (error) {
                 console.error('イベント作成エラー:', error);
@@ -694,7 +802,7 @@
             }
         }
 
-        // スプレッドシート更新（実装）
+        // スプレッドシート更新
         async function updateSpreadsheet(scheduleData, startDate) {
             try {
                 showStatus('📊 スプレッドシートを更新中...', 'info');
@@ -723,7 +831,7 @@
 
                 if (dataValues.length > 0) {
                     await gapi.client.sheets.spreadsheets.values.append({
-                        spreadsheetId: SPREADSHEET_ID,
+                        spreadsheetId: APP_CONFIG.SPREADSHEET_ID,
                         range: 'データ!A:C',
                         valueInputOption: 'RAW',
                         resource: {
@@ -758,7 +866,7 @@
 
                 // 週案シートを更新
                 await gapi.client.sheets.spreadsheets.values.update({
-                    spreadsheetId: SPREADSHEET_ID,
+                    spreadsheetId: APP_CONFIG.SPREADSHEET_ID,
                     range: '週案!A1:F7',
                     valueInputOption: 'RAW',
                     resource: {
@@ -774,62 +882,6 @@
             }
         }
 
-        // 処理実行
-        document.getElementById('processBtn').addEventListener('click', async function() {
-            const imageFileInput = document.getElementById('imageFile');
-            const imageFile = imageFileInput.files[0];
-
-            // 認証チェック
-            if (!isSignedIn) {
-                showStatus('❌ Googleアカウントでサインインしてください', 'error');
-                return;
-            }
-
-            if (!imageFile) {
-                showStatus('❌ 週案画像を選択してください', 'error');
-                return;
-            }
-
-            if (!timeSlots || timeSlots.length === 0) {
-                showStatus('❌ 時程表データが読み込まれていません', 'error');
-                return;
-            }
-
-            try {
-                this.innerHTML = '<span class="loading"></span>処理中...';
-                this.disabled = true;
-
-                // 1. 画像解析
-                scheduleData = await analyzeScheduleImage(imageFile);
-                
-                // 2. 解析結果表示
-                displaySchedulePreview(scheduleData);
-                
-                // 3. カレンダーイベント作成（現在の日付から月曜日を自動計算）
-                const today = new Date();
-                const monday = new Date(today);
-                const day = today.getDay();
-                const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-                monday.setDate(diff);
-                const startDateStr = monday.toISOString().split('T')[0];
-                
-                showStatus('📅 Googleカレンダーに予定を追加中...', 'info');
-                const events = await createCalendarEvents(scheduleData, startDateStr);
-                
-                // 4. スプレッドシート更新
-                const subjectCounts = await updateSpreadsheet(scheduleData, startDateStr);
-                
-                showStatus(`✅ 処理が完了しました！ ${events.length}件のイベントを作成し、スプレッドシートを更新しました。`, 'success');
-                
-            } catch (error) {
-                console.error('処理エラー:', error);
-                showStatus(`❌ 処理中にエラーが発生しました: ${error.message}`, 'error');
-            } finally {
-                this.innerHTML = '📅 カレンダーとスプレッドシートを更新';
-                this.disabled = false;
-            }
-        });
-
         // カレンダーイベント作成
         async function createCalendarEvents(scheduleData, startDateStr) {
             const events = [];
@@ -842,12 +894,10 @@
                 currentDate.setDate(startDate.getDate() + dayIndex);
                 
                 if (scheduleData[day]) {
-                    // その日の時程を取得
                     const dayTimeSlots = timeSlots.filter(slot => slot.曜日 === day);
                     
                     for (const [period, subject] of Object.entries(scheduleData[day])) {
                         if (subject && subject !== '－') {
-                            // 対応する時程を検索
                             const timeSlot = dayTimeSlots.find(slot => slot.Subject === period);
                             
                             if (timeSlot) {
@@ -862,6 +912,9 @@
                                         `${day}曜日 ${period}`
                                     );
                                     events.push(event);
+                                    
+                                    // API制限を避けるための待機
+                                    await new Promise(resolve => setTimeout(resolve, 100));
                                 } catch (error) {
                                     console.error(`イベント作成失敗: ${subject}`, error);
                                 }
@@ -873,6 +926,107 @@
             
             console.log(`${events.length}件のイベントを作成しました`);
             return events;
+        }
+
+        // 処理実行
+        document.getElementById('processBtn').addEventListener('click', async function() {
+            const imageFileInput = document.getElementById('imageFile');
+            const imageFile = imageFileInput.files[0];
+
+            // セキュリティチェック
+            if (!isSignedIn) {
+                showStatus('❌ Googleアカウントでサインインしてください', 'error');
+                return;
+            }
+
+            if (!usageTracker.checkLimit()) {
+                showStatus('❌ 本日の処理回数制限に達しました。明日再度お試しください。', 'error');
+                return;
+            }
+
+            if (!rateLimiter.canMakeRequest()) {
+                showStatus('❌ 処理が集中しています。1分後に再度お試しください。', 'error');
+                return;
+            }
+
+            const validation = validateFile(imageFile);
+            if (!validation.valid) {
+                showStatus(`❌ ${validation.error}`, 'error');
+                return;
+            }
+
+            if (!timeSlots || timeSlots.length === 0) {
+                showStatus('❌ 時程表データが読み込まれていません', 'error');
+                return;
+            }
+
+            try {
+                // レート制限記録
+                rateLimiter.recordRequest();
+                
+                this.innerHTML = '<span class="loading"></span>処理中...';
+                this.disabled = true;
+
+                // 1. 画像解析
+                scheduleData = await analyzeScheduleImage(imageFile);
+                
+                // 2. 解析結果表示
+                displaySchedulePreview(scheduleData);
+                
+                // 3. カレンダーイベント作成
+                const today = new Date();
+                const monday = new Date(today);
+                const day = today.getDay();
+                const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+                monday.setDate(diff);
+                const startDateStr = monday.toISOString().split('T')[0];
+                
+                showStatus('📅 Googleカレンダーに予定を追加中...', 'info');
+                const events = await createCalendarEvents(scheduleData, startDateStr);
+                
+                // 4. スプレッドシート更新
+                const subjectCounts = await updateSpreadsheet(scheduleData, startDateStr);
+                
+                // 使用量を記録
+                usageTracker.incrementUsage();
+                
+                showStatus(`✅ 処理が完了しました！ ${events.length}件のイベントを作成し、スプレッドシートを更新しました。`, 'success');
+                
+            } catch (error) {
+                console.error('処理エラー:', error);
+                
+                let errorMessage = '処理中にエラーが発生しました。';
+                if (error.status === 403) {
+                    errorMessage = 'Google APIの権限が不足しています。管理者にお問い合わせください。';
+                } else if (error.status === 429) {
+                    errorMessage = 'APIの使用量制限に達しました。しばらく時間をおいて再度お試しください。';
+                } else if (error.status === 401) {
+                    errorMessage = '認証が無効になりました。再度サインインしてください。';
+                }
+                
+                showStatus(`❌ ${errorMessage}`, 'error');
+            } finally {
+                this.innerHTML = '📅 カレンダーとスプレッドシートを更新';
+                this.disabled = false;
+            }
+        });
+
+        // フォーム完了チェック
+        function checkFormCompletion() {
+            const imageFile = document.getElementById('imageFile').files[0];
+            const processBtn = document.getElementById('processBtn');
+
+            const hasValidFile = imageFile && validateFile(imageFile).valid;
+            const isComplete = hasValidFile && timeSlots && timeSlots.length > 0 && isSignedIn && APP_CONFIG;
+            processBtn.disabled = !isComplete;
+
+            console.log('フォーム完了チェック:', {
+                hasValidFile: hasValidFile,
+                timeSlots: !!(timeSlots && timeSlots.length > 0),
+                isSignedIn: isSignedIn,
+                hasConfig: !!APP_CONFIG,
+                isComplete: isComplete
+            });
         }
 
         // 解析結果表示
@@ -913,6 +1067,37 @@
             });
             
             resultsSection.classList.remove('hidden');
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 設定チェック
+            if (!checkConfig()) {
+                return;
+            }
+            
+            // 時程表データを読み込み
+            loadTimeSlots();
+            
+            // Google API初期化
+            initializeGapi();
+            
+            // 初期状態でフォーム完了チェック
+            setTimeout(checkFormCompletion, 100);
+        });
+
+        // イベントリスナー
+        document.getElementById('authorizeBtn').addEventListener('click', signIn);
+
+        // エラーハンドリング
+        window.addEventListener('error', function(e) {
+            console.error('グローバルエラー:', e.error);
+            showStatus('❌ 予期しないエラーが発生しました。ページを再読み込みしてください。', 'error');
+        });
+
+        // セキュリティヘッダー確認（開発時のみ）
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            console.warn('⚠️ HTTPS接続を推奨します');
         }
     </script>
 </body>
