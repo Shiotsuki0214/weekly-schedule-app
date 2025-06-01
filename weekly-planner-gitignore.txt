@@ -1,0 +1,26 @@
+# 設定ファイル（機密情報を含む）
+config.js
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+
+# エディタ設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ログファイル
+*.log
+
+# 一時ファイル
+*.tmp
+*.temp
+
+# node_modules（将来的に使用する場合）
+node_modules/
+
+# ビルドファイル
+dist/
+build/

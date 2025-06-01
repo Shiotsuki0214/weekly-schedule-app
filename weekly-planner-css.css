@@ -1,0 +1,312 @@
+/* リセットとベーススタイル */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ヘッダー */
+header {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+header h1 {
+    color: #2c3e50;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+header p {
+    color: #7f8c8d;
+    font-size: 1.1rem;
+}
+
+/* セクション共通 */
+section {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+section h2 {
+    color: #34495e;
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+/* ボタン */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-block;
+    margin: 5px;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+
+.btn-secondary {
+    background-color: #9b59b6;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #8e44ad;
+}
+
+.btn-success {
+    background-color: #27ae60;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #229954;
+}
+
+/* アップロードエリア */
+.upload-area {
+    border: 2px dashed #bdc3c7;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+}
+
+.upload-area:hover {
+    border-color: #3498db;
+    background-color: #e3f2fd;
+}
+
+.upload-area.dragover {
+    border-color: #3498db;
+    background-color: #e3f2fd;
+}
+
+.upload-area p {
+    font-size: 1.2rem;
+    color: #7f8c8d;
+}
+
+/* 画像プレビュー */
+.image-preview {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* プログレスバー */
+.progress-bar {
+    width: 100%;
+    height: 30px;
+    background-color: #ecf0f1;
+    border-radius: 15px;
+    overflow: hidden;
+    position: relative;
+    margin: 20px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #3498db;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #2c3e50;
+    font-weight: bold;
+}
+
+/* OCR結果 */
+.ocr-result {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* 週案エディター */
+.week-plan-editor {
+    overflow-x: auto;
+}
+
+.week-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.week-table th,
+.week-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.week-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.week-table input {
+    width: 100%;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.week-table input:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+/* 日付選択 */
+.date-selector {
+    margin-bottom: 20px;
+}
+
+.date-selector label {
+    display: inline-block;
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.date-selector input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+/* ステータス表示 */
+.status {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    display: none;
+}
+
+.status.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    display: block;
+}
+
+.status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    display: block;
+}
+
+/* ログエリア */
+.log-area {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.log-entry {
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.log-entry.info {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.log-entry.success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.log-entry.error {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+/* レスポンシブ */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    section {
+        padding: 20px;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .week-table {
+        font-size: 0.9rem;
+    }
+    
+    .week-table th,
+    .week-table td {
+        padding: 5px;
+    }
+}

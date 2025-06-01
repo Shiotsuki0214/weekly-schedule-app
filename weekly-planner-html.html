@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>週案管理システム</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src='https://unpkg.com/tesseract.js@4.0.2/dist/tesseract.min.js'></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>週案管理システム</h1>
+            <p>週案の画像をアップロードして、Googleカレンダーとスプレッドシートに自動登録します</p>
+        </header>
+
+        <main>
+            <!-- Google認証セクション -->
+            <section class="auth-section">
+                <h2>1. Google認証</h2>
+                <button id="authBtn" class="btn btn-primary">Googleアカウントでログイン</button>
+                <div id="authStatus" class="status"></div>
+            </section>
+
+            <!-- 画像アップロードセクション -->
+            <section class="upload-section">
+                <h2>2. 週案画像のアップロード</h2>
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    <p>ここをクリックまたは画像をドラッグ＆ドロップ</p>
+                </div>
+                <div id="imagePreview" class="image-preview"></div>
+            </section>
+
+            <!-- OCR処理セクション -->
+            <section class="ocr-section">
+                <h2>3. OCR処理</h2>
+                <button id="ocrBtn" class="btn btn-secondary" disabled>画像を解析</button>
+                <div id="ocrProgress" class="progress-bar" style="display: none;">
+                    <div class="progress-fill"></div>
+                    <span class="progress-text">0%</span>
+                </div>
+                <div id="ocrResult" class="ocr-result"></div>
+            </section>
+
+            <!-- 週案データ編集セクション -->
+            <section class="edit-section">
+                <h2>4. 週案データの確認・編集</h2>
+                <div id="weekPlanEditor" class="week-plan-editor"></div>
+            </section>
+
+            <!-- 登録セクション -->
+            <section class="register-section">
+                <h2>5. カレンダー・スプレッドシートへの登録</h2>
+                <div class="date-selector">
+                    <label for="weekStartDate">週の開始日（月曜日）：</label>
+                    <input type="date" id="weekStartDate">
+                </div>
+                <button id="registerBtn" class="btn btn-success" disabled>登録実行</button>
+                <div id="registerProgress" class="progress-info"></div>
+            </section>
+
+            <!-- ログセクション -->
+            <section class="log-section">
+                <h2>処理ログ</h2>
+                <div id="logArea" class="log-area"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script async defer src="https://apis.google.com/js/api.js"></script>
+</body>
+</html>
