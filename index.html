@@ -462,25 +462,108 @@ window.APP_CONFIG = {
             }
         };
 
-        // 設定チェック
-        let APP_CONFIG = null;
-        let gapi;
-        let isSignedIn = false;
-        let scheduleData = null;
-        let timeSlots = null;
+        // トラブルシューティング情報表示
+        function showTroubleshootingInfo(error) {
+            const authStatus = document.getElementById('authStatus');
+            const currentDomain = window.location.origin;
+            
+            const troubleshootingHTML = `
+                <div class="status-message status-warning" style="margin-top: 15px;">
+                    <h4>🔧 トラブルシューティング</h4>
+                    <p><strong>現在のドメイン:</strong> ${currentDomain}</p>
+                    <p><strong>よくある解決方法:</strong></p>
+                    <ol style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>config.js ファイルを確認:</strong><br>
+                            - CLIENT_ID が正しく設定されているか<br>
+                            - API_KEY が正しく設定されているか
+                        </li>
+                        <li><strong>Google Cloud Console の設定:</strong><br>
+                            - 承認済みJavaScript生成元に <code>${currentDomain}</code> を追加<br>
+                            - HTTPリファラー制限に <code>${currentDomain}/*</code> を追加
+                        </li>
+                        <li><strong>API の有効化:</strong><br>
+                            - Google Calendar API が有効になっているか<br>
+                            - Google Sheets API が有効になっているか
+                        </li>
+                        <li><strong>ブラウザのキャッシュをクリア</strong></li>
+                    </ol>
+                    <p style="margin-top: 10px;">
+                        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color: #007bff;">
+                            🔗 Google Cloud Console で設定を確認
+                        </a>
+                    </p>
+                </div>
+            `;
+            
+            authStatus.innerHTML += troubleshootingHTML;
+        }
 
-        // 設定ファイル読み込みチェック
+        // 設定チェック
         function checkConfig() {
-            if (window.APP_CONFIG && window.APP_CONFIG.CLIENT_ID && window.APP_CONFIG.API_KEY) {
-                APP_CONFIG = window.APP_CONFIG;
-                document.getElementById('configStatus').innerHTML = 
-                    '<div class="status-message status-success">✅ 設定ファイルが正常に読み込まれました</div>';
-                return true;
-            } else {
-                document.getElementById('configStatus').innerHTML = 
-                    '<div class="status-message status-error">❌ config.js ファイルが見つからないか、設定が不完全です</div>';
+            const configDiv = document.getElementById('configStatus');
+            
+            if (!window.APP_CONFIG) {
+                configDiv.innerHTML = `
+                    <div class="status-message status-error">
+                        ❌ config.js ファイルが見つかりません<br>
+                        <small>同じフォルダに config.js ファイルを作成してください</small>
+                    </div>
+                `;
                 return false;
             }
+            
+            const config = window.APP_CONFIG;
+            const issues = [];
+            
+            if (!config.CLIENT_ID || config.CLIENT_ID === 'あなたのクライアントID') {
+                issues.push('CLIENT_ID が設定されていません');
+            }
+            
+            if (!config.API_KEY || config.API_KEY === 'あなたのAPIキー') {
+                issues.push('API_KEY が設定されていません');
+            }
+            
+            if (!config.SPREADSHEET_ID) {
+                issues.push('SPREADSHEET_ID が設定されていません');
+            }
+            
+            // フォーマットチェック
+            if (config.CLIENT_ID && !config.CLIENT_ID.includes('.apps.googleusercontent.com')) {
+                issues.push('CLIENT_ID の形式が正しくありません');
+            }
+            
+            if (config.API_KEY && !config.API_KEY.startsWith('AIza')) {
+                issues.push('API_KEY の形式が正しくありません');
+            }
+            
+            if (issues.length > 0) {
+                configDiv.innerHTML = `
+                    <div class="status-message status-error">
+                        ❌ 設定に問題があります:<br>
+                        ${issues.map(issue => `• ${issue}`).join('<br>')}
+                        <br><br>
+                        <strong>config.js の正しい例:</strong>
+                        <pre style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9em;">
+window.APP_CONFIG = {
+    CLIENT_ID: '123456789-xxxxx.apps.googleusercontent.com',
+    API_KEY: 'AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    SPREADSHEET_ID: '1RUYuKXKIKqMZ7M6B9cJnRHEsoAGqx1tkqXgBvK8jzLk'
+};
+                        </pre>
+                    </div>
+                `;
+                return false;
+            }
+            
+            APP_CONFIG = config;
+            configDiv.innerHTML = `
+                <div class="status-message status-success">
+                    ✅ 設定ファイルが正常に読み込まれました<br>
+                    <small>Client ID: ${config.CLIENT_ID.substring(0, 15)}...</small><br>
+                    <small>API Key: ${config.API_KEY.substring(0, 15)}...</small>
+                </div>
+            `;
+            return true;
         }
 
         // ファイル検証
@@ -597,11 +680,26 @@ window.APP_CONFIG = {
             }
 
             try {
-                await new Promise((resolve) => {
-                    gapi.load('auth2:client', resolve);
+                showAuthStatus('🔄 Google APIを初期化中...', 'info');
+                
+                // gapiライブラリが読み込まれているかチェック
+                if (typeof gapi === 'undefined') {
+                    throw new Error('Google API ライブラリが読み込まれていません');
+                }
+
+                await new Promise((resolve, reject) => {
+                    gapi.load('auth2:client', {
+                        callback: resolve,
+                        onerror: () => reject(new Error('GAPI ライブラリの読み込みに失敗'))
+                    });
                 });
 
-                await gapi.client.init({
+                console.log('GAPI初期化設定:', {
+                    apiKey: APP_CONFIG.API_KEY ? `${APP_CONFIG.API_KEY.substring(0, 10)}...` : 'なし',
+                    clientId: APP_CONFIG.CLIENT_ID ? `${APP_CONFIG.CLIENT_ID.substring(0, 10)}...` : 'なし'
+                });
+
+                const initParams = {
                     apiKey: APP_CONFIG.API_KEY,
                     clientId: APP_CONFIG.CLIENT_ID,
                     discoveryDocs: [
@@ -609,18 +707,44 @@ window.APP_CONFIG = {
                         'https://sheets.googleapis.com/$discovery/rest?version=v4'
                     ],
                     scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets'
-                });
+                };
 
+                await gapi.client.init(initParams);
+
+                // 認証状態を確認
                 const authInstance = gapi.auth2.getAuthInstance();
+                if (!authInstance) {
+                    throw new Error('認証インスタンスの作成に失敗');
+                }
+
                 isSignedIn = authInstance.isSignedIn.get();
                 
                 updateAuthStatus();
                 authInstance.isSignedIn.listen(updateAuthStatus);
                 
                 console.log('Google API初期化完了');
+                showAuthStatus('✅ Google API初期化完了', 'success');
             } catch (error) {
                 console.error('Google API初期化エラー:', error);
-                showAuthStatus('❌ Google API初期化に失敗しました', 'error');
+                
+                let errorMessage = '❌ Google API初期化に失敗しました: ';
+                
+                if (error.message.includes('API key')) {
+                    errorMessage += 'APIキーが無効です。';
+                } else if (error.message.includes('Client ID')) {
+                    errorMessage += 'クライアントIDが無効です。';
+                } else if (error.message.includes('origin')) {
+                    errorMessage += 'ドメインが許可リストに登録されていません。';
+                } else if (error.details) {
+                    errorMessage += error.details;
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                showAuthStatus(errorMessage, 'error');
+                
+                // 詳細なトラブルシューティング情報を表示
+                showTroubleshootingInfo(error);
             }
         }
 
@@ -1071,19 +1195,35 @@ window.APP_CONFIG = {
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
-            // 設定チェック
+            console.log('アプリケーション初期化開始');
+            
+            // 1. 設定チェック
             if (!checkConfig()) {
+                console.log('設定チェック失敗');
                 return;
             }
+            console.log('設定チェック完了');
             
-            // 時程表データを読み込み
-            loadTimeSlots();
+            // 2. 時程表データを読み込み
+            if (!loadTimeSlots()) {
+                console.log('時程表データ読み込み失敗');
+                return;
+            }
+            console.log('時程表データ読み込み完了');
             
-            // Google API初期化
-            initializeGapi();
+            // 3. Google API初期化（少し遅延させる）
+            setTimeout(() => {
+                if (typeof gapi !== 'undefined') {
+                    console.log('Google API初期化開始');
+                    initializeGapi();
+                } else {
+                    console.error('Google API ライブラリが読み込まれていません');
+                    showAuthStatus('❌ Google API ライブラリの読み込みに失敗しました。ページを再読み込みしてください。', 'error');
+                }
+            }, 1000);
             
-            // 初期状態でフォーム完了チェック
-            setTimeout(checkFormCompletion, 100);
+            // 4. 初期状態でフォーム完了チェック
+            setTimeout(checkFormCompletion, 1500);
         });
 
         // イベントリスナー
