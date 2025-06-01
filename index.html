@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+// 認証ステータス表示
+        function showAuthStatus(message, type) {
+            const authStatus = document.getElementById('authStatus');
+            authStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+        }<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -348,6 +352,9 @@ window.APP_CONFIG = {
                     <button id="authorizeBtn" class="btn" disabled>
                         🔓 Googleアカウントでサインイン
                     </button>
+                    <button id="signOutBtn" class="btn hidden" style="margin-left: 10px; background: #dc3545;">
+                        🚪 サインアウト
+                    </button>
                     <div id="authStatus" style="margin-top: 15px;"></div>
                 </div>
                 
@@ -672,7 +679,7 @@ window.APP_CONFIG = {
             }
         }
 
-        // Google API初期化
+        // Google API初期化（新しいGISライブラリ使用）
         async function initializeGapi() {
             if (!APP_CONFIG) {
                 showAuthStatus('❌ 設定ファイルを読み込んでください', 'error');
@@ -682,48 +689,49 @@ window.APP_CONFIG = {
             try {
                 showAuthStatus('🔄 Google APIを初期化中...', 'info');
                 
-                // gapiライブラリが読み込まれているかチェック
-                if (typeof gapi === 'undefined') {
-                    throw new Error('Google API ライブラリが読み込まれていません');
-                }
-
+                // 1. GAPI Client初期化
                 await new Promise((resolve, reject) => {
-                    gapi.load('auth2:client', {
+                    gapi.load('client', {
                         callback: resolve,
-                        onerror: () => reject(new Error('GAPI ライブラリの読み込みに失敗'))
+                        onerror: () => reject(new Error('GAPI クライアントライブラリの読み込みに失敗'))
                     });
                 });
 
-                console.log('GAPI初期化設定:', {
-                    apiKey: APP_CONFIG.API_KEY ? `${APP_CONFIG.API_KEY.substring(0, 10)}...` : 'なし',
-                    clientId: APP_CONFIG.CLIENT_ID ? `${APP_CONFIG.CLIENT_ID.substring(0, 10)}...` : 'なし'
-                });
-
-                const initParams = {
+                // 2. API Client設定
+                await gapi.client.init({
                     apiKey: APP_CONFIG.API_KEY,
-                    clientId: APP_CONFIG.CLIENT_ID,
                     discoveryDocs: [
                         'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
                         'https://sheets.googleapis.com/$discovery/rest?version=v4'
-                    ],
-                    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets'
-                };
+                    ]
+                });
 
-                await gapi.client.init(initParams);
+                console.log('GAPI Client初期化完了');
 
-                // 認証状態を確認
-                const authInstance = gapi.auth2.getAuthInstance();
-                if (!authInstance) {
-                    throw new Error('認証インスタンスの作成に失敗');
-                }
+                // 3. Google Identity Services (GIS) Token Client初期化
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: APP_CONFIG.CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets',
+                    callback: (response) => {
+                        if (response.error) {
+                            console.error('認証エラー:', response.error);
+                            showAuthStatus('❌ 認証に失敗しました', 'error');
+                            isSignedIn = false;
+                        } else {
+                            console.log('認証成功:', response);
+                            accessToken = response.access_token;
+                            gapi.client.setToken({access_token: accessToken});
+                            isSignedIn = true;
+                            showAuthStatus('✅ Google認証が完了しました', 'success');
+                        }
+                        updateAuthStatus();
+                    }
+                });
 
-                isSignedIn = authInstance.isSignedIn.get();
-                
+                console.log('Google Identity Services初期化完了');
+                showAuthStatus('✅ Google API初期化完了。サインインしてください。', 'success');
                 updateAuthStatus();
-                authInstance.isSignedIn.listen(updateAuthStatus);
                 
-                console.log('Google API初期化完了');
-                showAuthStatus('✅ Google API初期化完了', 'success');
             } catch (error) {
                 console.error('Google API初期化エラー:', error);
                 
@@ -735,31 +743,22 @@ window.APP_CONFIG = {
                     errorMessage += 'クライアントIDが無効です。';
                 } else if (error.message.includes('origin')) {
                     errorMessage += 'ドメインが許可リストに登録されていません。';
-                } else if (error.details) {
-                    errorMessage += error.details;
                 } else {
                     errorMessage += error.message;
                 }
                 
                 showAuthStatus(errorMessage, 'error');
-                
-                // 詳細なトラブルシューティング情報を表示
                 showTroubleshootingInfo(error);
             }
         }
 
-        // 認証状態更新
+        // 認証状態更新（新しいGIS対応）
         function updateAuthStatus() {
-            const authInstance = gapi.auth2.getAuthInstance();
-            isSignedIn = authInstance.isSignedIn.get();
-            
             const authorizeBtn = document.getElementById('authorizeBtn');
             const usageStatsDiv = document.getElementById('usageStats');
             
-            if (isSignedIn) {
-                const user = authInstance.currentUser.get();
-                const profile = user.getBasicProfile();
-                authorizeBtn.textContent = `✅ ${profile.getName()}でサインイン中`;
+            if (isSignedIn && accessToken) {
+                authorizeBtn.textContent = `✅ サインイン済み`;
                 authorizeBtn.disabled = true;
                 showAuthStatus('✅ Google認証が完了しました。', 'success');
                 
@@ -775,20 +774,40 @@ window.APP_CONFIG = {
             checkFormCompletion();
         }
 
-        // 認証ステータス表示
-        function showAuthStatus(message, type) {
-            const authStatus = document.getElementById('authStatus');
-            authStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
-        }
+        // サインイン処理（新しいGIS使用）
+        function signIn() {
+            if (!tokenClient) {
+                showAuthStatus('❌ 認証システムが初期化されていません', 'error');
+                return;
+            }
 
-        // サインイン処理
-        async function signIn() {
             try {
-                const authInstance = gapi.auth2.getAuthInstance();
-                await authInstance.signIn();
+                // 既存のトークンをクリア
+                if (accessToken) {
+                    google.accounts.oauth2.revoke(accessToken, () => {
+                        console.log('既存のトークンを取り消しました');
+                    });
+                }
+                
+                // 新しい認証を開始
+                tokenClient.requestAccessToken({prompt: 'consent'});
             } catch (error) {
                 console.error('サインインエラー:', error);
                 showAuthStatus('❌ サインインに失敗しました', 'error');
+            }
+        }
+
+        // サインアウト処理
+        function signOut() {
+            if (accessToken) {
+                google.accounts.oauth2.revoke(accessToken, () => {
+                    console.log('トークンを取り消しました');
+                });
+                gapi.client.setToken(null);
+                accessToken = null;
+                isSignedIn = false;
+                updateAuthStatus();
+                showAuthStatus('✅ サインアウトしました', 'info');
             }
         }
 
@@ -1211,9 +1230,9 @@ window.APP_CONFIG = {
             }
             console.log('時程表データ読み込み完了');
             
-            // 3. Google API初期化（少し遅延させる）
+            // 3. Google API初期化（GAPIとGISライブラリの読み込み完了を待つ）
             setTimeout(() => {
-                if (typeof gapi !== 'undefined') {
+                if (typeof gapi !== 'undefined' && typeof google !== 'undefined' && google.accounts) {
                     console.log('Google API初期化開始');
                     initializeGapi();
                 } else {
@@ -1228,6 +1247,7 @@ window.APP_CONFIG = {
 
         // イベントリスナー
         document.getElementById('authorizeBtn').addEventListener('click', signIn);
+        document.getElementById('signOutBtn').addEventListener('click', signOut);
 
         // エラーハンドリング
         window.addEventListener('error', function(e) {
