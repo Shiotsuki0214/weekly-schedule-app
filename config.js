@@ -3,7 +3,7 @@ const CONFIG = {
     API_KEY: 'AIzaSyAi6BG9NeJFHh6s565E7obnbE27wpmqP-k',
     
     // Google Cloud Consoleで取得したOAuth 2.0クライアントID
-    CLIENT_ID: '128812767208-k0aqkvnccauv1r7ukajqsungulquit4u.apps.googleusercontent.com'',
+    CLIENT_ID: '128812767208-k0aqkvnccauv1r7ukajqsungulquit4u.apps.googleusercontent.com',
     
     // 使用するGoogle APIのスコープ
     SCOPES: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets',
