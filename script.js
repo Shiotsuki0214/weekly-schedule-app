@@ -1,5 +1,6 @@
 // グローバル変数
 let auth2;
+let isGoogleAPILoaded = false;
 let weekPlanData = {
     monday: [],
     tuesday: [],
@@ -84,6 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
 });
 
+// Google APIスクリプトが読み込まれたときに呼ばれる
+window.onGoogleAPILoad = function() {
+    handleClientLoad();
+};
+
 // アプリの初期化
 function initializeApp() {
     // イベントリスナーの設定
@@ -92,9 +98,14 @@ function initializeApp() {
     // 今週の月曜日を初期値として設定
     setDefaultWeekStartDate();
     
-    // Google APIの初期化
-    if (window.gapi) {
-        handleClientLoad();
+    // 初期ログメッセージ
+    addLog('アプリケーションを初期化しています...', 'info');
+    
+    // config.jsの存在確認
+    if (typeof CONFIG === 'undefined') {
+        addLog('config.jsが見つかりません。READMEを参照してセットアップしてください。', 'error');
+        document.getElementById('authStatus').textContent = 'セットアップが必要です';
+        document.getElementById('authStatus').className = 'status error';
     }
 }
 
@@ -154,17 +165,50 @@ function handleClientLoad() {
 }
 
 function initClient() {
+    // CONFIG が定義されているか確認
+    if (typeof CONFIG === 'undefined') {
+        addLog('エラー: config.jsが見つかりません。config.example.jsをconfig.jsにコピーして設定してください。', 'error');
+        document.getElementById('authStatus').textContent = 'config.jsが見つかりません';
+        document.getElementById('authStatus').className = 'status error';
+        return;
+    }
+    
+    // 必要な設定が存在するか確認
+    if (!CONFIG.API_KEY || !CONFIG.CLIENT_ID) {
+        addLog('エラー: APIキーまたはクライアントIDが設定されていません。', 'error');
+        document.getElementById('authStatus').textContent = 'API設定エラー';
+        document.getElementById('authStatus').className = 'status error';
+        return;
+    }
+    
     gapi.client.init({
         apiKey: CONFIG.API_KEY,
         clientId: CONFIG.CLIENT_ID,
         discoveryDocs: CONFIG.DISCOVERY_DOCS,
         scope: CONFIG.SCOPES
     }).then(() => {
+        isGoogleAPILoaded = true;
         auth2 = gapi.auth2.getAuthInstance();
         auth2.isSignedIn.listen(updateSigninStatus);
         updateSigninStatus(auth2.isSignedIn.get());
+        addLog('Google APIの初期化が完了しました', 'success');
     }).catch(error => {
-        addLog('Google API初期化エラー: ' + error.message, 'error');
+        console.error('Google API初期化エラー:', error);
+        let errorMessage = 'Google API初期化エラー: ';
+        
+        if (error.error === 'idpiframe_initialization_failed') {
+            errorMessage += 'サードパーティーCookieが無効になっている可能性があります。ブラウザの設定を確認してください。';
+        } else if (error.error && error.error.message) {
+            errorMessage += error.error.message;
+        } else if (error.message) {
+            errorMessage += error.message;
+        } else {
+            errorMessage += JSON.stringify(error);
+        }
+        
+        addLog(errorMessage, 'error');
+        document.getElementById('authStatus').textContent = 'API初期化エラー';
+        document.getElementById('authStatus').className = 'status error';
     });
 }
 
@@ -186,17 +230,25 @@ function updateSigninStatus(isSignedIn) {
 }
 
 function handleAuthClick() {
-    // auth2 が初期化されているか確認
-    if (auth2) {
-        if (auth2.isSignedIn.get()) {
-            auth2.signOut();
-        } else {
-            auth2.signIn();
-        }
+    if (!isGoogleAPILoaded || !auth2) {
+        addLog('Google認証がまだ初期化されていません。しばらくお待ちください。', 'error');
+        return;
+    }
+    
+    if (auth2.isSignedIn.get()) {
+        auth2.signOut().then(() => {
+            addLog('ログアウトしました', 'info');
+        });
     } else {
-        // auth2 がまだ初期化されていない場合のログ
-        addLog('Google認証がまだ初期化されていません。しばらくお待ちください。', 'warning');
-        // 必要に応じて、認証ボタンを一時的に無効にするなどのUIフィードバックを追加
+        auth2.signIn().then(() => {
+            addLog('ログインしました', 'success');
+        }).catch(error => {
+            if (error.error === 'popup_closed_by_user') {
+                addLog('ログインがキャンセルされました', 'info');
+            } else {
+                addLog('ログインエラー: ' + (error.error || error), 'error');
+            }
+        });
     }
 }
 
